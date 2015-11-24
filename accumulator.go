@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/influxdb/telegraf/internal/config"
+
 	"github.com/influxdb/influxdb/client/v2"
 )
 
@@ -26,12 +28,12 @@ type Accumulator interface {
 }
 
 func NewAccumulator(
-	plugin *ConfiguredPlugin,
+	pluginConfig *config.PluginConfig,
 	points chan *client.Point,
 ) Accumulator {
 	acc := accumulator{}
 	acc.points = points
-	acc.plugin = plugin
+	acc.pluginConfig = pluginConfig
 	return &acc
 }
 
@@ -44,7 +46,7 @@ type accumulator struct {
 
 	debug bool
 
-	plugin *ConfiguredPlugin
+	pluginConfig *config.PluginConfig
 
 	prefix string
 }
@@ -96,8 +98,8 @@ func (ac *accumulator) AddFields(
 		measurement = ac.prefix + measurement
 	}
 
-	if ac.plugin != nil {
-		if !ac.plugin.ShouldPass(measurement) || !ac.plugin.ShouldTagsPass(tags) {
+	if ac.pluginConfig != nil {
+		if !ac.pluginConfig.ShouldPass(measurement) || !ac.pluginConfig.ShouldTagsPass(tags) {
 			return
 		}
 	}
