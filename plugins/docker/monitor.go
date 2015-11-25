@@ -14,6 +14,8 @@ type monitorContainer struct {
     tags         map[string]string
     statsChan    chan *docker.Stats
     stats        *docker.Stats
+
+    cpuStats    docker.CPUStats
 }
 
 func (self monitorContainer) String() string {
@@ -42,7 +44,7 @@ func (self *monitorContainer) start(dockerClient *docker.Client, listContainer d
 // maintain latests stats
 func (self *monitorContainer) run() {
     for dockerStats := range self.statsChan {
-        self.log.Printf("%v\n", dockerStats)
+        self.log.Printf("Stats\n")
 
         self.stats = dockerStats
     }
@@ -69,4 +71,33 @@ func newMonitorContainer(dockerClient *docker.Client, listContainer docker.APICo
     go monitorContainer.run()
 
     return monitorContainer
+}
+
+// return fields for docker2_cpu metric
+// computes usage deltas from the previous gather cycle for accounting accuracy over our entire interval
+func (self *monitorContainer) GatherCPU() map[string]interface{} {
+    fields := make(map[string]interface{})
+
+    stats := self.stats.CPUStats
+
+    fields["count"]         = len(stats.CPUUsage.PercpuUsage)
+
+    // XXX: are these fields even useful...?
+    fields["total_usage"]   = stats.CPUUsage.TotalUsage
+    fields["user_usage"]    = stats.CPUUsage.UsageInUsermode
+    fields["kernel_usage"]  = stats.CPUUsage.UsageInKernelmode
+    fields["system_usage"]  = stats.SystemCPUUsage
+
+    if self.cpuStats.SystemCPUUsage != 0 {
+        prevStats := self.cpuStats
+
+        fields["total_delta"]   = stats.CPUUsage.TotalUsage         - prevStats.CPUUsage.TotalUsage
+        fields["user_delta"]    = stats.CPUUsage.UsageInUsermode    - prevStats.CPUUsage.UsageInUsermode
+        fields["kernel_delta"]  = stats.CPUUsage.UsageInKernelmode  - prevStats.CPUUsage.UsageInKernelmode
+        fields["system_delta"]  = stats.SystemCPUUsage              - prevStats.SystemCPUUsage
+    }
+
+    self.cpuStats = stats
+
+    return fields
 }

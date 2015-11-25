@@ -94,11 +94,27 @@ func (self *Docker) Gather(acc plugins.Accumulator) error {
             continue
         }
 
-        memoryFields := map[string]interface{}{
-            "usage":    dockerStats.MemoryStats.Usage,
-        }
+        acc.AddFields("network", map[string]interface{}{
+            "rx_bytes":     dockerStats.Network.RxBytes,
+            "rx_dropped":   dockerStats.Network.RxDropped,
+            "rx_errors":    dockerStats.Network.RxErrors,
+            "rx_packets":   dockerStats.Network.RxPackets,
+            "tx_bytes":     dockerStats.Network.TxBytes,
+            "tx_dropped":   dockerStats.Network.TxDropped,
+            "tx_errors":    dockerStats.Network.TxErrors,
+            "tx_packets":   dockerStats.Network.TxPackets,
+        }, monitorContainer.tags, dockerStats.Read)
 
-        acc.AddFields("memory", memoryFields, monitorContainer.tags, dockerStats.Read)
+        acc.AddFields("memory", map[string]interface{}{
+            "cache":        dockerStats.MemoryStats.Stats.Cache,
+            "rss":          dockerStats.MemoryStats.Stats.Rss,
+            "max_usage":    dockerStats.MemoryStats.MaxUsage,
+            "usage":        dockerStats.MemoryStats.Usage,
+            "failcnt":      dockerStats.MemoryStats.Failcnt,
+            "limit":        dockerStats.MemoryStats.Limit,
+        }, monitorContainer.tags, dockerStats.Read)
+
+        acc.AddFields("cpu", monitorContainer.GatherCPU(), monitorContainer.tags, dockerStats.Read)
     }
 
     return nil
