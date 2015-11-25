@@ -15,7 +15,8 @@ type monitorContainer struct {
     statsChan    chan *docker.Stats
     stats        *docker.Stats
 
-    cpuStats    docker.CPUStats
+    // calculating deltas in gather()
+    prevStats  *docker.Stats
 }
 
 func (self monitorContainer) String() string {
@@ -78,26 +79,26 @@ func newMonitorContainer(dockerClient *docker.Client, listContainer docker.APICo
 func (self *monitorContainer) GatherCPU() map[string]interface{} {
     fields := make(map[string]interface{})
 
-    stats := self.stats.CPUStats
+    stats := self.stats
+    prevStats := self.prevStats
 
-    fields["count"]         = len(stats.CPUUsage.PercpuUsage)
+    fields["count"]         = len(stats.CPUStats.CPUUsage.PercpuUsage)
 
     // XXX: are these fields even useful...?
-    fields["total_usage"]   = stats.CPUUsage.TotalUsage
-    fields["user_usage"]    = stats.CPUUsage.UsageInUsermode
-    fields["kernel_usage"]  = stats.CPUUsage.UsageInKernelmode
-    fields["system_usage"]  = stats.SystemCPUUsage
+    fields["total_usage"]   = stats.CPUStats.CPUUsage.TotalUsage
+    fields["user_usage"]    = stats.CPUStats.CPUUsage.UsageInUsermode
+    fields["kernel_usage"]  = stats.CPUStats.CPUUsage.UsageInKernelmode
+    fields["system_usage"]  = stats.CPUStats.SystemCPUUsage
 
-    if self.cpuStats.SystemCPUUsage != 0 {
-        prevStats := self.cpuStats
-
-        fields["total_delta"]   = stats.CPUUsage.TotalUsage         - prevStats.CPUUsage.TotalUsage
-        fields["user_delta"]    = stats.CPUUsage.UsageInUsermode    - prevStats.CPUUsage.UsageInUsermode
-        fields["kernel_delta"]  = stats.CPUUsage.UsageInKernelmode  - prevStats.CPUUsage.UsageInKernelmode
-        fields["system_delta"]  = stats.SystemCPUUsage              - prevStats.SystemCPUUsage
+    // only calculate deltas if we have prev stats
+    if prevStats != nil && prevStats.Read != stats.Read {
+        fields["total_delta"]   = stats.CPUStats.CPUUsage.TotalUsage         - prevStats.CPUStats.CPUUsage.TotalUsage
+        fields["user_delta"]    = stats.CPUStats.CPUUsage.UsageInUsermode    - prevStats.CPUStats.CPUUsage.UsageInUsermode
+        fields["kernel_delta"]  = stats.CPUStats.CPUUsage.UsageInKernelmode  - prevStats.CPUStats.CPUUsage.UsageInKernelmode
+        fields["system_delta"]  = stats.CPUStats.SystemCPUUsage              - prevStats.CPUStats.SystemCPUUsage
     }
 
-    self.cpuStats = stats
+    self.prevStats = stats
 
     return fields
 }
