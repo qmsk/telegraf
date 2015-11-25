@@ -9,11 +9,14 @@ import (
 
 type Docker struct {
     log *log.Logger
+
+    containers map[string]*monitorContainer
 }
 
 func newDocker() plugins.Plugin {
     return &Docker{
-        log:    log.New(os.Stderr, "plugins/docker: ", 0),
+        log:        log.New(os.Stderr, "plugins/docker: ", 0),
+        containers: make(map[string]*monitorContainer),
     }
 }
 
@@ -37,26 +40,9 @@ func (self *Docker) dockerClient() (*docker.Client, error) {
     }
 }
 
-func (self *Docker) gatherStats(acc plugins.Accumulator, listContainer docker.APIContainers, statsChan chan *docker.Stats) {
-    // gath
-    containerTags := map[string]string{
-            "id":       listContainer.ID,
-            "image":    listContainer.Image,
-            "name":     listContainer.Names[0][1:],
-    }
-
-    for dockerStats := range statsChan {
-        self.log.Printf("gatherStats %s: %v\n", listContainer.ID, dockerStats)
-
-        memoryFields := map[string]interface{}{
-            "usage":    dockerStats.MemoryStats.Usage,
-        }
-
-        acc.AddFields("memory", memoryFields, containerTags, dockerStats.Read)
-    }
-}
-
-func (self *Docker) Gather(acc plugins.Accumulator) error {
+// maintain the list of monitored containers
+// self.containers should be an up-to-date list of monitored containers
+func (self *Docker) updateContainers() error {
     dockerClient, err := self.dockerClient()
     if err != nil {
         return err
@@ -66,22 +52,53 @@ func (self *Docker) Gather(acc plugins.Accumulator) error {
     if err != nil {
         return err
     }
+
+    // add new containers
     for _, listContainer := range listContainers {
-        statsChan := make(chan *docker.Stats)
-        statsOptions := docker.StatsOptions{
-            ID:     listContainer.ID,
-            Stats:  statsChan,
-            Stream: false,
+        if _, exists := self.containers[listContainer.ID]; !exists {
+            monitorContainer := newMonitorContainer(dockerClient, listContainer)
+
+            self.log.Printf("New container: %v\n", monitorContainer)
+
+            self.containers[listContainer.ID] = monitorContainer
+
+            // XXX: wait
+            for monitorContainer.stats == nil {
+
+            }
+        }
+    }
+
+    // cleanup dead containers
+    for containerID, monitorContainer := range self.containers {
+        if monitorContainer.stats == nil {
+            self.log.Printf("Drop container: %v\n", monitorContainer)
+            delete(self.containers, containerID)
+        }
+    }
+
+    return nil
+}
+
+func (self *Docker) Gather(acc plugins.Accumulator) error {
+    if err := self.updateContainers(); err != nil {
+        return err
+    }
+
+    // gather
+    for _, monitorContainer := range self.containers {
+        // XXX: safe?
+        dockerStats := monitorContainer.stats
+
+        if dockerStats == nil {
+            continue
         }
 
-        self.log.Printf("Gather container %v...\n", listContainer.ID)
-        go func() {
-            if err := dockerClient.Stats(statsOptions); err != nil {
-                close(statsChan)
-            }
-        }()
+        memoryFields := map[string]interface{}{
+            "usage":    dockerStats.MemoryStats.Usage,
+        }
 
-        self.gatherStats(acc, listContainer, statsChan)
+        acc.AddFields("memory", memoryFields, monitorContainer.tags, dockerStats.Read)
     }
 
     return nil
