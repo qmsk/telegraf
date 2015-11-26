@@ -87,8 +87,14 @@ func (self *Docker) Gather(acc plugins.Accumulator) error {
 
         if dockerStats != nil {
             acc.AddFields("network", monitorContainer.GatherNetwork(), monitorContainer.tags, dockerStats.Read)
-            acc.AddFields("memory", monitorContainer.GatherMemory(), monitorContainer.tags, dockerStats.Read)
-            acc.AddFields("cpu", monitorContainer.GatherCPU(), monitorContainer.tags, dockerStats.Read)
+
+            if memoryFields := monitorContainer.GatherMemory(); memoryFields != nil {
+                acc.AddFields("memory", memoryFields, monitorContainer.tags, dockerStats.Read)
+            }
+
+            if cpuFields := monitorContainer.GatherCPU(); cpuFields != nil {
+                acc.AddFields("cpu", cpuFields, monitorContainer.tags, dockerStats.Read)
+            }
         }
     }
 

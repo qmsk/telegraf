@@ -96,20 +96,23 @@ func (self *monitorContainer) GatherNetwork() map[string]interface{} {
     return fields
 }
 
+// returns nil map if there are no valid memory stats, e.g. if memory cgroup is not enabled
 func (self *monitorContainer) GatherMemory() map[string]interface{} {
-    fields := make(map[string]interface{})
-
     stats := self.stats
 
     // omit memory stats if cgroup is missing
-    if stats.MemoryStats.Usage != 0 && stats.MemoryStats.MaxUsage != 0 {
-        fields["cache"]     = stats.MemoryStats.Stats.Cache
-        fields["rss"]       = stats.MemoryStats.Stats.Rss
-        fields["max_usage"] = stats.MemoryStats.MaxUsage
-        fields["usage"]     = stats.MemoryStats.Usage
-        fields["failcnt"]   = stats.MemoryStats.Failcnt
-        fields["limit"]     = stats.MemoryStats.Limit
+    if stats.MemoryStats.Usage == 0 && stats.MemoryStats.MaxUsage == 0 {
+        return nil
     }
+
+    fields := make(map[string]interface{})
+
+    fields["cache"]     = stats.MemoryStats.Stats.Cache
+    fields["rss"]       = stats.MemoryStats.Stats.Rss
+    fields["max_usage"] = stats.MemoryStats.MaxUsage
+    fields["usage"]     = stats.MemoryStats.Usage
+    fields["failcnt"]   = stats.MemoryStats.Failcnt
+    fields["limit"]     = stats.MemoryStats.Limit
 
     return fields
 }
