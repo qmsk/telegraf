@@ -10,6 +10,7 @@ import (
 type Docker struct {
     log *log.Logger
 
+    _dockerClient    *docker.Client
     containers map[string]*monitorContainer
 }
 
@@ -28,13 +29,16 @@ func (self *Docker) SampleConfig() string {
     return ""
 }
 
+// TODO: service plugin..
 func (self *Docker) dockerClient() (*docker.Client, error) {
-    self.log.Printf("ENV DOCKER_CERT_PATH=%s\n", os.Getenv("DOCKER_CERT_PATH"))
-
-    if dockerClient, err := docker.NewClientFromEnv(); err != nil {
+    if self._dockerClient != nil {
+        return self._dockerClient, nil
+    } else if dockerClient, err := docker.NewClientFromEnv(); err != nil {
         return nil, err
     } else {
         self.log.Printf("docker.Client %+v\n", dockerClient)
+
+        self._dockerClient = dockerClient
 
         return dockerClient, nil
     }
