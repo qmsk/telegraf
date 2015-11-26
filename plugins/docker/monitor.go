@@ -74,6 +74,41 @@ func newMonitorContainer(dockerClient *docker.Client, listContainer docker.APICo
     return monitorContainer
 }
 
+func (self *monitorContainer) GatherNetwork() map[string]interface{} {
+    fields := make(map[string]interface{})
+
+    stats := self.stats
+
+    fields["rx_bytes"]      = stats.Network.RxBytes
+    fields["rx_dropped"]    = stats.Network.RxDropped
+    fields["rx_errors"]     = stats.Network.RxErrors
+    fields["rx_packets"]    = stats.Network.RxPackets
+    fields["tx_bytes"]      = stats.Network.TxBytes
+    fields["tx_dropped"]    = stats.Network.TxDropped
+    fields["tx_errors"]     = stats.Network.TxErrors
+    fields["tx_packets"]    = stats.Network.TxPackets
+
+    return fields
+}
+
+func (self *monitorContainer) GatherMemory() map[string]interface{} {
+    fields := make(map[string]interface{})
+
+    stats := self.stats
+
+    // omit memory stats if cgroup is missing
+    if stats.MemoryStats.Usage != 0 && stats.MemoryStats.MaxUsage != 0 {
+        fields["cache"]     = stats.MemoryStats.Stats.Cache
+        fields["rss"]       = stats.MemoryStats.Stats.Rss
+        fields["max_usage"] = stats.MemoryStats.MaxUsage
+        fields["usage"]     = stats.MemoryStats.Usage
+        fields["failcnt"]   = stats.MemoryStats.Failcnt
+        fields["limit"]     = stats.MemoryStats.Limit
+    }
+
+    return fields
+}
+
 // return fields for docker2_cpu metric
 // computes usage deltas from the previous gather cycle for accounting accuracy over our entire interval
 func (self *monitorContainer) GatherCPU() map[string]interface{} {
