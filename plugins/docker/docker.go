@@ -61,18 +61,13 @@ func (self *Docker) updateContainers() error {
             self.log.Printf("New container: %v\n", monitorContainer)
 
             self.containers[listContainer.ID] = monitorContainer
-
-            // XXX: wait
-            for monitorContainer.stats == nil {
-
-            }
         }
     }
 
     // cleanup dead containers
     for containerID, monitorContainer := range self.containers {
-        if monitorContainer.stats == nil {
-            self.log.Printf("Drop container: %v\n", monitorContainer)
+        if !monitorContainer.alive {
+            self.log.Printf("Reap container: %v\n", monitorContainer)
             delete(self.containers, containerID)
         }
     }

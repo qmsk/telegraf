@@ -13,6 +13,8 @@ type monitorContainer struct {
     log         *log.Logger
     tags         map[string]string
     statsChan    chan *docker.Stats
+    alive        bool
+
     stats        *docker.Stats
 
     // calculating deltas in gather()
@@ -40,6 +42,8 @@ func (self *monitorContainer) start(dockerClient *docker.Client, listContainer d
     } else {
         self.log.Printf("End\n")
     }
+
+    self.alive = false
 }
 
 // maintain latests stats
@@ -66,6 +70,7 @@ func newMonitorContainer(dockerClient *docker.Client, listContainer docker.APICo
             "name":     containerName,
         },
         statsChan:  make(chan *docker.Stats),
+        alive:      true,
     }
 
     go monitorContainer.start(dockerClient, listContainer)
