@@ -9,16 +9,17 @@ import (
 
 // monitored container state
 type monitorContainer struct {
-    name        string
+    name         string
     log         *log.Logger
+    debug        bool
     tags         map[string]string
     statsChan    chan *docker.Stats
     alive        bool
 
-    stats        *docker.Stats
+    stats       *docker.Stats
 
     // calculating deltas in gather()
-    prevStats  *docker.Stats
+    prevStats   *docker.Stats
 }
 
 func (self monitorContainer) String() string {
@@ -34,7 +35,7 @@ func (self *monitorContainer) start(dockerClient *docker.Client, listContainer d
         Stream: true,
     }
 
-    self.log.Printf("Start %#v...\n", statsOptions)
+    self.log.Printf("Start...\n")
 
     // this is a blocking operation
     if err := dockerClient.Stats(statsOptions); err != nil {
@@ -49,7 +50,9 @@ func (self *monitorContainer) start(dockerClient *docker.Client, listContainer d
 // maintain latests stats
 func (self *monitorContainer) run() {
     for dockerStats := range self.statsChan {
-        self.log.Printf("Stats\n")
+        if self.debug {
+            self.log.Printf("Stats\n")
+        }
 
         self.stats = dockerStats
     }
@@ -64,6 +67,7 @@ func newMonitorContainer(dockerClient *docker.Client, listContainer docker.APICo
     monitorContainer := &monitorContainer{
         name:       containerName,
         log:        log.New(os.Stderr, fmt.Sprintf("plugins/docker %s: ", listContainer.ID), 0),
+        debug:      false,
         tags:       map[string]string{
             "id":       listContainer.ID,
             "image":    listContainer.Image,
