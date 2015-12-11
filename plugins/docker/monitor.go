@@ -129,6 +129,11 @@ func (self *monitorContainer) GatherCPU() map[string]interface{} {
     stats := self.stats
     prevStats := self.prevStats
 
+    if stats.CPUStats.SystemCPUUsage == 0 || stats.CPUStats.CPUUsage.TotalUsage == 0 {
+        // stats for a stopped container are reported as 0
+        return nil
+    }
+
     fields["count"]         = len(stats.CPUStats.CPUUsage.PercpuUsage)
 
     // XXX: are these fields even useful...?
