@@ -129,11 +129,6 @@ func (self *monitorContainer) GatherCPU() map[string]interface{} {
     stats := self.stats
     prevStats := self.prevStats
 
-    if stats.CPUStats.SystemCPUUsage == 0 || stats.CPUStats.CPUUsage.TotalUsage == 0 {
-        // stats for a stopped container are reported as 0
-        return nil
-    }
-
     fields["count"]         = len(stats.CPUStats.CPUUsage.PercpuUsage)
 
     // XXX: are these fields even useful...?
@@ -143,7 +138,16 @@ func (self *monitorContainer) GatherCPU() map[string]interface{} {
     fields["system_usage"]  = stats.CPUStats.SystemCPUUsage
 
     // only calculate deltas if we have prev stats
-    if prevStats != nil && prevStats.Read != stats.Read {
+    if prevStats == nil || prevStats.Read == stats.Read {
+        // nothing to compare to
+
+    } else if stats.CPUStats.CPUUsage.TotalUsage == 0 || stats.CPUStats.SystemCPUUsage == 0 {
+        // ignore stopped container
+
+    } else if stats.CPUStats.CPUUsage.TotalUsage < prevStats.CPUStats.CPUUsage.TotalUsage {
+        // counters reset on container restart
+
+    } else {
         fields["total_delta"]   = stats.CPUStats.CPUUsage.TotalUsage         - prevStats.CPUStats.CPUUsage.TotalUsage
         fields["user_delta"]    = stats.CPUStats.CPUUsage.UsageInUsermode    - prevStats.CPUStats.CPUUsage.UsageInUsermode
         fields["kernel_delta"]  = stats.CPUStats.CPUUsage.UsageInKernelmode  - prevStats.CPUStats.CPUUsage.UsageInKernelmode
